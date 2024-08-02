@@ -1,4 +1,4 @@
-CREATE OR REPLACE PROCEDURE MENTARITV_LIVE.PRC_GET_AMORT_PO_V2 (AD_DATE DATE)  IS
+CREATE OR REPLACE PROCEDURE PRC_GET_AMORT_PO_V2 (AD_DATE DATE)  IS
 /******************************************************************************
    NAME:       PRC_GET_AMORT_PO
    PURPOSE:    TO GET AMOR VALUE OF RUN AIRED
@@ -8,26 +8,26 @@ CREATE OR REPLACE PROCEDURE MENTARITV_LIVE.PRC_GET_AMORT_PO_V2 (AD_DATE DATE)  I
    ---------  ----------  ---------------  ------------------------------------
                                            ANTV
 ******************************************************************************/
-LD_DATE_FROM    DATE;
-LD_DATE_TO      DATE;
-LL_COUNT        NUMBER;
-ll_amort_val    NUMERIC(18,2);
-ll_amort_val_old    NUMERIC(18,2);
-ll_amort_val_new    NUMERIC(18,2);
-LS_TEXT     VARCHAR2(200);
-ERR_CODE    VARCHAR2(50);
-ERR_NAME    VARCHAR2(100);
-ERR_MSG     VARCHAR2(500);
-LS_ROW_ID   VARCHAR2(18);
-major_sap VARCHAR2(6);
-source_code_sap VARCHAR2(6);
-ls_prog_category_sap varchar2(254);
-ls_sub_category_sap varchar2(254);
-i               NUMBER;
-ii              NUMBER;
-iii             NUMBER;
+LD_DATE_FROM          DATE;
+LD_DATE_TO            DATE;
+LL_COUNT              NUMBER;
+ll_amort_val          NUMERIC(18,2);
+ll_amort_val_old      NUMERIC(18,2);
+ll_amort_val_new      NUMERIC(18,2);
+LS_TEXT               VARCHAR2(200);
+ERR_CODE              VARCHAR2(50);
+ERR_NAME              VARCHAR2(100);
+ERR_MSG               VARCHAR2(500);
+LS_ROW_ID             VARCHAR2(18);
+major_sap             VARCHAR2(6);
+source_code_sap       VARCHAR2(6);
+ls_prog_category_sap  varchar2(254);
+ls_sub_category_sap   varchar2(254);
+i                     NUMBER;
+ii                    NUMBER;
+iii                   NUMBER;
 
-cursor c1 (LD_DATE_FROM date,LD_DATE_TO      DATE) is
+cursor c1 (LD_DATE_FROM DATE,LD_DATE_TO DATE) is
 
 SELECT H.PUR_CONTRACT_NO ,
            H.REVISION_NO,
@@ -65,14 +65,13 @@ SELECT H.PUR_CONTRACT_NO ,
                           ( RH.LAST_DATE  BETWEEN ADD_MONTHS( LD_DATE_FROM, -5)  AND LD_DATE_TO  )  AND
                           ( RH.last_date <= LD_DATE_TO)))
          ) and
-         ( c.last_date > '31-Dec-2016')
+         ( c.last_date > to_date('20240430','YYYYMMDD')) --Remark Modify - Ridwan, ( c.last_date > '31-Dec-2016')
          --and ( to_char(H.PUR_CONTRACT_DATE,'YYYYMM')) >= '201701'
     order by H.PUR_CONTRACT_NO ,
            H.REVISION_NO,
            A.PROG_ID,
            B.EPI_NO,
-           C.RUN_ID
-           ;
+           C.RUN_ID;
 
 BEGIN
    LL_COUNT := 0 ;
@@ -101,7 +100,6 @@ BEGIN
             AND run_id = x.run_id
           --  AND trans_type='C'
             ;
-
 
                --- If Episode not in GRM_MP TABLE then follwoing
         IF i=0  THEN
@@ -146,8 +144,8 @@ BEGIN
              ERR_MSG    := SUBSTR(SQLERRM,1,500 );
 
              INSERT INTO SYN_SAP_ERROR_LOG
-               (CODE, NAME, ERROR_REASON, UPDATE_DATE, ROW_ID)
-             Values(ERR_CODE, ERR_NAME, ERR_MSG, SYSDATE, GET_ROW_ID()) ;
+               (CODE, NAME, ERROR_REASON, UPDATE_DATE)
+             Values(ERR_CODE, ERR_NAME, ERR_MSG, SYSDATE) ;
          END;
     else
          SELECT COUNT(1)  INTO ii
@@ -155,16 +153,14 @@ BEGIN
           WHERE REF_NO = x.PUR_CONTRACT_NO
             AND row_id_epi= x.row_id_epi
             AND run_id = x.run_id
-            AND nvl(SAP_TIMEST,'Ctztx' ) = 'Ctztx'
-            ;
+            AND nvl(SAP_TIMEST,'Ctztx' ) = 'Ctztx';
 
         if ii = 0 then
          DELETE SYN_G_SAP_AMRTIZATION_V2
           WHERE REF_NO = x.PUR_CONTRACT_NO
             AND row_id_epi= x.row_id_epi
             AND run_id = x.run_id
-            AND nvl(SAP_TIMEST,'Ctztx' ) = 'Ctztx'
-            ;
+            AND nvl(SAP_TIMEST,'Ctztx' ) = 'Ctztx';
 
             ll_amort_val :=  x.AMOR_HOME_VAL;
             ll_amort_val_new := ll_amort_val;
@@ -209,32 +205,28 @@ BEGIN
                      ERR_MSG    := SUBSTR(SQLERRM,1,500 );
 
                      INSERT INTO SYN_SAP_ERROR_LOG
-                       (CODE, NAME, ERROR_REASON, UPDATE_DATE, ROW_ID)
-                     Values(ERR_CODE, ERR_NAME, ERR_MSG, SYSDATE, GET_ROW_ID()) ;
+                       (CODE, NAME, ERROR_REASON, UPDATE_DATE)
+                     Values(ERR_CODE, ERR_NAME, ERR_MSG, SYSDATE) ;
                  END;
-
         else
 
          DELETE SYN_G_SAP_AMRTIZATION_V2
           WHERE REF_NO = x.PUR_CONTRACT_NO
             AND row_id_epi= x.row_id_epi
             AND run_id = x.run_id
-            AND nvl(SAP_TIMEST,'Ctztx' ) = 'Ctztx'
-            ;
+            AND nvl(SAP_TIMEST,'Ctztx' ) = 'Ctztx';
 
          SELECT sum(AMOUNT)  INTO ll_amort_val_old
            FROM SYN_G_SAP_AMRTIZATION_V2
           WHERE REF_NO = x.PUR_CONTRACT_NO
             AND row_id_epi= x.row_id_epi
             AND run_id = x.run_id
-            AND nvl(SAP_TIMEST,'Ctztx' ) <> 'Ctztx'
-            ;
+            AND nvl(SAP_TIMEST,'Ctztx' ) <> 'Ctztx';
 
             ll_amort_val :=  x.AMOR_HOME_VAL;
             ll_amort_val_new := ll_amort_val - ll_amort_val_old;
 
             if ll_amort_val_new <> 0 then
-
                 begin
                    select a.sap_code
                       into source_code_sap
@@ -266,7 +258,7 @@ BEGIN
                           'IDR', source_code_sap, major_sap, null, ll_amort_val_new,
                           LS_TEXT, TO_CHAR(SYSDATE,'YYYYMMDD HH24MISS'),  ' ', LS_ROW_ID, to_char(x.last_date,'YYYYMMDD'),
                           x.FILM_TITLE, x.FILM_EPI_TITLE, x.EPI_NO, x.ROW_ID_FILM,
-                          x.ROW_ID_EPI, x.PROG_ID, x.last_TIME, null, null, x.RUN_ID ) ;
+                          x.ROW_ID_EPI, x.PROG_ID, x.last_TIME, null, null, x.RUN_ID );
                  EXCEPTION
                   WHEN OTHERS THEN
                      ERR_CODE   := '20011';
@@ -275,11 +267,10 @@ BEGIN
                      ERR_MSG    := SUBSTR(SQLERRM,1,500 );
 
                      INSERT INTO SYN_SAP_ERROR_LOG
-                       (CODE, NAME, ERROR_REASON, UPDATE_DATE, ROW_ID)
-                     Values(ERR_CODE, ERR_NAME, ERR_MSG, SYSDATE, GET_ROW_ID()) ;
+                       (CODE, NAME, ERROR_REASON, UPDATE_DATE)
+                     Values(ERR_CODE, ERR_NAME, ERR_MSG, SYSDATE) ;
                  END;
             end if;
-
         end if;
 
 
@@ -292,4 +283,6 @@ BEGIN
     COMMIT ;
 
 END PRC_GET_AMORT_PO_V2;
+ 
 /
+
